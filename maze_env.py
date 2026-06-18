@@ -1,70 +1,84 @@
-import numpy as np
+
+import jax.numpy as jnp
+from brax.envs import State
 
 class MazeEnv:
-    def __init__(self,maze):
-        self.state = None
-        self.goal = None
+    def __init__(self, maze):
         self.maze = maze
         self.n_rows = len(maze)
         self.n_cols = len(maze[0])
-        self.is_done = False
+        self.action_size = 4 
+        self.state_dim = 2
+        self.goal_indices = [0,1]
+        self.observation_size = 4 # bo 2 na current_pos i 2 na desired_goal
 
-        self.action_map = {
-            0: [-1,0], # up
-            1: [1,0],  # down
-            2: [0,-1], # left
-            3: [0,1],  # right
-        }
+        start = jnp.where(self.maze == 3)
+        finish = jnp.where(self.maze == 4)
+        
+        self.start_pos = (start[0][0], start[1][0]) 
+        self.goal = (finish[0][0], finish[1][0])
+        
+        self.action_map = jnp.array([
+            [-1,0], # up
+            [1,0],  # down
+            [0,-1], # left
+            [0,1],  # right
+        ])
 
-
-    def reset(self):
-        start = np.where(self.maze == 3)
-        finish = np.where(self.maze == 4)
-        start_row = start[0][0]
-        start_col = start[1][0]
-        end_row = finish[0][0]
-        end_col = finish[1][0]
-
-        self.state = (start_row,start_col)
-        self.goal = (end_row,end_col)
-
-        return {
-            'observation':self.state,
-            'desired_goal':self.goal
-        }
+    def reset(self, rng):
+        return State(
+            pipeline_state=None,
+            obs = jnp.array(
+                self.start_pos+self.goal
+            ),
+            reward=jnp.zeros(()), 
+            done=jnp.zeros(()),
+            metrics={
+                'success': jnp.zeros(()),
+                'success_easy': jnp.zeros(()),
+                'dist': jnp.zeros(()),
+                'distance_from_origin': jnp.zeros(()),
+            },
+            info={}
+        )
         
     def step(self,state,action):
-        current_move = self.action_map[action]
-        new_row = state[0]+current_move[0]
-        new_col = state[1]+current_move[1]
-        # np.where()
+        # przeliczanie wektorowe
+        action_idx = jnp.argmax(action)
+        current_move = self.action_map[action_idx]
+        current_row = state.obs[0]
+        current_col = state.obs[1]
+        new_row = current_row + current_move[0]
+        new_col = current_col + current_move[1]
+
         is_valid_move =(
             ( new_row >= 0 ) & ( new_row < self.n_rows ) &
             ( new_col >= 0 ) & ( new_col < self.n_cols ) &
             (self.maze[new_row,new_col] != 1 )
         )
-        # if new_row >= 0 and new_row < self.n_rows and new_col >= 0 and new_col < self.n_cols:
-            
-        #     if self.maze[new_row][new_col] != 1:
-        #         state = (new_row,new_col)
-        #     else:
-        #         pass
-        final_row = np.where(is_valid_move,new_row,state[0])
-        final_col = np.where(is_valid_move,new_col,state[1])
 
+        final_row = jnp.where(is_valid_move,new_row,current_row)
+        final_col = jnp.where(is_valid_move,new_col,current_col)
         next_state = (final_row,final_col)
-        is_done = (next_state == self.goal)
-        reward = 0 if is_done else -1
+        
+        dist = jnp.abs(final_row-self.goal[0]) + jnp.abs(final_col-self.goal[1])
+        distance_from_origin = jnp.abs(final_row-self.start_pos[0]) + jnp.abs(final_col-self.start_pos[1])
 
-        return {
-            'obs':{
-                'observation': state,
-                'desired_goal':self.goal,
+        is_done = ((final_row == self.goal[0]) & (final_col == self.goal[1]))
+
+        reward = jnp.where(is_done,0.0,-1.0)
+        
+        return State(
+            pipeline_state=None,
+            obs = jnp.array(
+                next_state+self.goal
+            ),
+            reward = reward,
+            done = is_done.astype(jnp.float32),
+            metrics = {**state.metrics,'success': is_done.astype(jnp.float32),
+            'success_easy': is_done.astype(jnp.float32),  
+            'dist': dist.astype(jnp.float32),
+            'distance_from_origin': distance_from_origin.astype(jnp.float32),
             },
-            'reward': reward,
-            'done': is_done,
-            'info': {
-                'row': state[0],
-                'col': state[1],
-            }
-        }
+            info = state.info,
+        )
