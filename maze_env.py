@@ -33,27 +33,38 @@ class MazeEnv:
             'desired_goal':self.goal
         }
         
-    def step(self,action):
+    def step(self,state,action):
         current_move = self.action_map[action]
-        new_row = self.state[0]+current_move[0]
-        new_col = self.state[1]+current_move[1]
-
-        if new_row >= 0 and new_row < self.n_rows and new_col >= 0 and new_col < self.n_cols:
+        new_row = state[0]+current_move[0]
+        new_col = state[1]+current_move[1]
+        # np.where()
+        is_valid_move =(
+            ( new_row >= 0 ) & ( new_row < self.n_rows ) &
+            ( new_col >= 0 ) & ( new_col < self.n_cols ) &
+            (self.maze[new_row,new_col] != 1 )
+        )
+        # if new_row >= 0 and new_row < self.n_rows and new_col >= 0 and new_col < self.n_cols:
             
-            if self.maze[new_row][new_col] != 1:
-                self.state = (new_row,new_col)
-            else:
-                pass
-        
-        is_done = (self.state == self.goal)
+        #     if self.maze[new_row][new_col] != 1:
+        #         state = (new_row,new_col)
+        #     else:
+        #         pass
+        final_row = np.where(is_valid_move,new_row,state[0])
+        final_col = np.where(is_valid_move,new_col,state[1])
+
+        next_state = (final_row,final_col)
+        is_done = (next_state == self.goal)
         reward = 0 if is_done else -1
 
-        return (
-            {
-            'observation':self.state,
-            'desired_goal':self.goal
+        return {
+            'obs':{
+                'observation': state,
+                'desired_goal':self.goal,
             },
-            reward,
-            is_done,
-            {}
-        )
+            'reward': reward,
+            'done': is_done,
+            'info': {
+                'row': state[0],
+                'col': state[1],
+            }
+        }
