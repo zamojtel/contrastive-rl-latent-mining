@@ -25,7 +25,6 @@ class MazeEnv:
         ])
 
     def reset(self, rng):
-        # TUTAJ NAPRAWIONO: używamy jax.random zamiast jnp.random
         maze_id = jax.random.randint(rng, shape=(), minval=0, maxval=4)
         current_start = self.start_positions[maze_id]
         current_goal = self.goal_positions[maze_id]
