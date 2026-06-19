@@ -38,7 +38,7 @@ class MazeEnv:
                 'success': jnp.zeros(()),
                 'success_easy': jnp.zeros(()),
                 'dist': jnp.zeros(()),
-                'distance_from_origin': jnp.zeros(()),
+                'distance_from_origin': jnp.zeros(())
             },
             info={'maze_index': maze_id}
         )
@@ -78,10 +78,12 @@ class MazeEnv:
             obs = obs,
             reward = reward,
             done = is_done.astype(jnp.float32),
-            metrics = {**state.metrics,'success': is_done.astype(jnp.float32),
-            'success_easy': is_done.astype(jnp.float32),  
-            'dist': dist.astype(jnp.float32),
-            'distance_from_origin': distance_from_origin.astype(jnp.float32),
+            metrics={
+                **state.metrics, 
+                'success': is_done.astype(jnp.float32), 
+                'success_easy': is_done.astype(jnp.float32),
+                'dist': dist.astype(jnp.float32),
+                'distance_from_origin': jnp.zeros(())
             },
             info = state.info,
         )

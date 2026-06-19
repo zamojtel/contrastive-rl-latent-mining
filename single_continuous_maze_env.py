@@ -9,6 +9,8 @@ class SingleContinuousMazeEnv:
         
         self.action_size = 2
         self.observation_size = 4
+        self.state_dim = 2
+        self.goal_indices = [0, 1]
 
         free_cells = jnp.column_stack(jnp.where(self.maze != 1))
         self.free_cells = free_cells.astype(jnp.float32)
@@ -16,7 +18,7 @@ class SingleContinuousMazeEnv:
 
     def reset(self, rng):
         rng1, rng2, rng3, rng4 = jax.random.split(rng, 4)
-    
+        
         start_idx = jax.random.randint(rng1, shape=(), minval=0, maxval=self.num_free_cells)
         goal_idx = jax.random.randint(rng2, shape=(), minval=0, maxval=self.num_free_cells)
         
@@ -31,7 +33,12 @@ class SingleContinuousMazeEnv:
             obs=obs,
             reward=jnp.zeros(()), 
             done=jnp.zeros(()),
-            metrics={'success': jnp.zeros(()), 'dist': jnp.zeros(())},
+            metrics={
+                'success': jnp.zeros(()),
+                'success_easy': jnp.zeros(()),
+                'dist': jnp.zeros(()),
+                'distance_from_origin': jnp.zeros(())
+            },
             info={'goal': goal_pos}
         )
         
@@ -41,16 +48,17 @@ class SingleContinuousMazeEnv:
         
         action = jnp.clip(action, -1.0, 1.0)
         new_pos = current_pos + action * 0.5
+
         new_pos = jnp.clip(new_pos, 0.0, jnp.array([self.n_rows - 0.01, self.n_cols - 0.01]))
-        
+  
         grid_pos = jnp.floor(new_pos).astype(jnp.int32)
         is_wall = self.maze[grid_pos[0], grid_pos[1]] == 1
         
+
         final_pos = jnp.where(is_wall, current_pos, new_pos)
         
         dist = jnp.linalg.norm(final_pos - current_goal)
-        is_done = dist < 0.5
-        
+        is_done = dist < 0.5 
         reward = jnp.where(is_done, 0.0, -1.0)
         
         norm_factor = jnp.array([self.n_rows, self.n_cols], dtype=jnp.float32)
@@ -61,6 +69,12 @@ class SingleContinuousMazeEnv:
             obs=obs,
             reward=reward,
             done=is_done.astype(jnp.float32),
-            metrics={**state.metrics, 'success': is_done.astype(jnp.float32), 'dist': dist.astype(jnp.float32)},
+            metrics={
+                **state.metrics, 
+                'success': is_done.astype(jnp.float32), 
+                'success_easy': is_done.astype(jnp.float32),
+                'dist': dist.astype(jnp.float32),
+                'distance_from_origin': jnp.zeros(())
+            },
             info=state.info,
         )

@@ -1,4 +1,5 @@
 from maze_env import MazeEnv
+from single_continuous_maze_env import SingleContinuousMazeEnv
 import jax.numpy as jnp
 from jaxgcrl.agents import CRL
 import time
@@ -21,52 +22,67 @@ def print_progress(num_steps, metrics,*args, **kwargs):
 
 class Config:
     def __init__(self):
+        # self.num_envs = 1024
+        # self.num_eval_envs = 256
+        # self.episode_length = 257
         self.num_envs = 1024
         self.num_eval_envs = 256
-        self.episode_length = 257
+        self.episode_length = 100
         self.action_repeat = 1
-        self.total_env_steps = 50_000_000
+        self.total_env_steps = 51_200_000
         self.num_evals = 10
         self.seed = 42
         self.visualization_interval = 10
         self.checkpoint_logdir = "./my_agent"
 
 maze = jnp.array([
-# Labirynt 0
-[
-[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-[3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-],
-# Labirynt 1
-[
-[0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-[0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-[3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4],
-[0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-[0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
-],
-# Labirynt 2
-[
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-[0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-[3, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 4],
-[0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-],
-# Labirynt 3
-[
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-[3, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0],
-[0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-]
+    # Labirynt 0:
+    [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+        [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4], 
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ],
+    
+    # Labirynt 1:
+    [
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], 
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], 
+        [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4], 
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0], 
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]
+    ],
+    # Labirynt 2:
+    [
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 0],
+        [3, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 4], 
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ],
+    
+    # Labirynt 3:
+    [
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        [3, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 4],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ],
+    
+    # Labirynt 4:
+    [
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+        [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [3, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ]
 ])
 
-env = MazeEnv(maze)
+# env = MazeEnv(maze)
+env = SingleContinuousMazeEnv(maze[2])
 agent = CRL()
 print("Batch size agenta to:", agent.batch_size)
 print("starting compilation and training")
