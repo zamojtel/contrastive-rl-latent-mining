@@ -122,8 +122,18 @@ def load_params(path: str):
 
 def save_params(path: str, params: Any):
     """Saves parameters in flax format."""
-    with epath.Path(path).open("wb") as fout:
+    checkpoint_path = epath.Path(path)
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    with checkpoint_path.open("wb") as fout:
         fout.write(pickle.dumps(params))
+
+
+def _extract_params(training_state: TrainingState):
+    return (
+        training_state.alpha_state.params,
+        training_state.actor_state.params,
+        training_state.critic_state.params,
+    )
 
 
 @dataclass
@@ -302,6 +312,12 @@ class CRL:
             critic_state=critic_state,
             alpha_state=alpha_state,
         )
+
+        if config.checkpoint_logdir:
+            save_params(
+                f"{config.checkpoint_logdir}/step_0.pkl",
+                _extract_params(training_state),
+            )
 
         # Replay Buffer
         dummy_obs = jnp.zeros((obs_size,))
@@ -575,6 +591,12 @@ class CRL:
             }
             current_step = int(training_state.env_steps.item())
 
+            # Save learned parameters before evaluation and external callbacks.
+            params = _extract_params(training_state)
+            if config.checkpoint_logdir:
+                path = f"{config.checkpoint_logdir}/step_{current_step}.pkl"
+                save_params(path, params)
+
             metrics = evaluator.run_evaluation(training_state, metrics)
             logging.info("step: %d", current_step)
 
@@ -589,17 +611,6 @@ class CRL:
                 unwrapped_env,
                 do_render=do_render,
             )
-
-            # Package the latest parameters regardless of checkpoint settings.
-            params = (
-                training_state.alpha_state.params,
-                training_state.actor_state.params,
-                training_state.critic_state.params,
-            )
-
-            if config.checkpoint_logdir:
-                path = f"{config.checkpoint_logdir}/step_{int(training_state.env_steps)}.pkl"
-                save_params(path, params)
 
         total_steps = current_step
         assert total_steps >= config.total_env_steps
