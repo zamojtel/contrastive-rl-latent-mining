@@ -52,7 +52,7 @@ def main(config: Config):
         group=config.run.wandb_group,
         name=config.run.exp_name,
         config=info,
-        mode="online" if config.run.log_wandb else "disabled",
+        mode=config.run.wandb_mode if config.run.log_wandb else "disabled",
     )
 
     env = create_env(
@@ -102,6 +102,8 @@ def main(config: Config):
         run_dir,
         config.run.exp_name,
         mode=config.run.wandb_mode,
+        render_enabled=config.run.render,
+        wandb_enabled=config.run.log_wandb,
     )
 
     _, params, _ = config.agent.train_fn(

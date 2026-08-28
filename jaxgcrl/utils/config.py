@@ -74,7 +74,8 @@ class RunConfig:
     # online or offline
     wandb_mode: Literal["online", "offline"] = "online"
 
-    # render frequency
+    # trajectory rendering
+    render: bool = True
     visualization_interval: int = 5
 
     vis_length: int = 1000

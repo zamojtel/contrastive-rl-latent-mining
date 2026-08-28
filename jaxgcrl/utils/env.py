@@ -1,9 +1,11 @@
 import argparse
+import csv
 import logging
 import math
 import os
 from collections import namedtuple
 from datetime import datetime
+from numbers import Real
 from typing import List
 
 import flax.linen as nn
@@ -208,35 +210,78 @@ class MetricsRecorder:
         exp_dir,
         exp_name,
         mode,
+        *,
+        render_enabled=True,
+        wandb_enabled=True,
     ):
         self.x_data = []
         self.y_data = {}
         self.y_data_err = {}
         self.times = [datetime.now()]
-        self.metrics_to_collect = metrics_to_collect
+        self.metrics_to_collect = list(metrics_to_collect)
         self.exp_dir = exp_dir
         self.exp_name = exp_name
         self.mode = mode
+        self.render_enabled = render_enabled
+        self.wandb_enabled = wandb_enabled
 
         self.max_x, self.min_x = total_env_steps * 1.1, 0
 
-        if mode == "offline":
+        os.makedirs(self.exp_dir, exist_ok=True)
+        self.metrics_path = os.path.join(self.exp_dir, "metrics.csv")
+        self.metrics_fieldnames = ["step", *self.metrics_to_collect]
+        with open(self.metrics_path, "w", newline="", encoding="utf-8") as file:
+            csv.DictWriter(file, fieldnames=self.metrics_fieldnames).writeheader()
+
+        self.trigger_sync = None
+        if self.wandb_enabled and mode == "offline":
             wandb_osh.set_log_level("ERROR")
-        self.trigger_sync = TriggerWandbSyncHook()
+            self.trigger_sync = TriggerWandbSyncHook()
+
+    @staticmethod
+    def _to_scalar(value, metric_name):
+        if hasattr(value, "item"):
+            try:
+                value = value.item()
+            except (TypeError, ValueError) as error:
+                raise ValueError(
+                    f"Metric {metric_name!r} must be scalar."
+                ) from error
+        if not isinstance(value, Real):
+            raise ValueError(f"Metric {metric_name!r} must be a real scalar.")
+        return value
 
     def record(self, num_steps, metrics):
         self.times.append(datetime.now())
-        self.x_data.append(int(num_steps))
+        step = int(num_steps)
+        self.x_data.append(step)
+        row = {"step": step}
 
-        for key, value in metrics.items():
+        for key in self.metrics_to_collect:
+            value = self._to_scalar(metrics.get(key, 0), key)
+            error = self._to_scalar(
+                metrics.get(f"{key}_std", 0),
+                f"{key}_std",
+            )
+
             if key not in self.y_data:
                 self.y_data[key] = []
                 self.y_data_err[key] = []
 
             self.y_data[key].append(value)
-            self.y_data_err[key].append(metrics.get(f"{key}_std", 0))
+            self.y_data_err[key].append(error)
+            row[key] = value
+
+        with open(self.metrics_path, "a", newline="", encoding="utf-8") as file:
+            csv.DictWriter(
+                file,
+                fieldnames=self.metrics_fieldnames,
+            ).writerow(row)
 
     def log_wandb(self):
+        if not self.wandb_enabled:
+            return
+
         data_to_log = {}
         for key, value in self.y_data.items():
             data_to_log[key] = value[-1]
@@ -285,13 +330,10 @@ class MetricsRecorder:
         for key in self.metrics_to_collect:
             self.ensure_metric(metrics, key)
 
-        if do_render:
+        if self.render_enabled and do_render:
             render(make_policy, params, env, self.exp_dir, self.exp_name, num_steps)
 
-        self.record(
-            num_steps,
-            {key: value for key, value in metrics.items() if key in self.metrics_to_collect},
-        )
+        self.record(num_steps, metrics)
         self.log_wandb()
         self.print_progress()
 
