@@ -55,9 +55,17 @@ def main(config: Config):
         mode="online" if config.run.log_wandb else "disabled",
     )
 
-    env = create_env(env_name=config.run.env, backend=config.run.backend)
+    env = create_env(
+        env_name=config.run.env,
+        backend=config.run.backend,
+        maze_size_scaling=config.run.maze_size_scaling,
+    )
     if config.run.eval_env:
-        eval_env = create_env(env_name=config.run.eval_env, backend=config.run.backend)
+        eval_env = create_env(
+            env_name=config.run.eval_env,
+            backend=config.run.backend,
+            maze_size_scaling=config.run.maze_size_scaling,
+        )
     else:
         eval_env = env
 

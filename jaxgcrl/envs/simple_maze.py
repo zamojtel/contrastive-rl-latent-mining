@@ -3,10 +3,13 @@ import xml.etree.ElementTree as ET
 
 import jax
 import mujoco
+import numpy as np
 from brax import base, math
 from brax.envs.base import PipelineEnv, State
 from brax.io import mjcf
 from jax import numpy as jnp
+
+from jaxgcrl.envs.maze_layouts import CUSTOM_MAZE_GRIDS, FREE
 
 # This is based on original Ant environment from Brax
 # https://github.com/google/brax/blob/main/brax/envs/ant.py
@@ -91,25 +94,68 @@ def find_goals(structure, size_scaling):
     return jnp.array(goals)
 
 
-# Create a xml with maze and a list of possible goal positions
+def compile_custom_layout(grid, size_scaling):
+    """Converts a display-oriented grid into JaxGCRL coordinates."""
+    grid = np.asarray(grid, dtype=np.int8)
+    height, _ = grid.shape
+
+    # Notebook: (row, col), row 0 at the top.
+    # JaxGCRL: layout indices are Cartesian (x, y).
+    maze_layout = np.flipud(grid).T
+
+    free_rows, free_cols = np.where(grid == FREE)
+    free_xy = np.column_stack(
+        (free_cols, height - 1 - free_rows)
+    ).astype(np.float32)
+
+    free_positions = jnp.asarray(
+        free_xy * size_scaling
+    )
+
+    return maze_layout, free_positions
+
+
+# Create an XML maze and lists of possible positions.
 def make_maze(maze_layout_name, maze_size_scaling):
-    if maze_layout_name == "u_maze":
-        maze_layout = U_MAZE
-    elif maze_layout_name == "u_maze_eval":
-        maze_layout = U_MAZE_EVAL
-    elif maze_layout_name == "big_maze":
-        maze_layout = BIG_MAZE
-    elif maze_layout_name == "big_maze_eval":
-        maze_layout = BIG_MAZE_EVAL
-    elif maze_layout_name == "hardest_maze":
-        maze_layout = HARDEST_MAZE
+    if maze_layout_name in CUSTOM_MAZE_GRIDS:
+        maze_layout, free_positions = (
+            compile_custom_layout(
+                CUSTOM_MAZE_GRIDS[maze_layout_name],
+                maze_size_scaling,
+            )
+        )
+        possible_starts = free_positions
+        possible_goals = free_positions
     else:
-        raise ValueError(f"Unknown maze layout: {maze_layout_name}")
+        if maze_layout_name == "u_maze":
+            maze_layout = U_MAZE
+        elif maze_layout_name == "u_maze_eval":
+            maze_layout = U_MAZE_EVAL
+        elif maze_layout_name == "big_maze":
+            maze_layout = BIG_MAZE
+        elif maze_layout_name == "big_maze_eval":
+            maze_layout = BIG_MAZE_EVAL
+        elif maze_layout_name == "hardest_maze":
+            maze_layout = HARDEST_MAZE
+        else:
+            raise ValueError(
+                f"Unknown maze layout: {maze_layout_name}"
+            )
 
-    xml_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "simple_maze.xml")
+        possible_starts = find_starts(
+            maze_layout,
+            maze_size_scaling,
+        )
+        possible_goals = find_goals(
+            maze_layout,
+            maze_size_scaling,
+        )
 
-    possible_starts = find_starts(maze_layout, maze_size_scaling)
-    possible_goals = find_goals(maze_layout, maze_size_scaling)
+    xml_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "assets",
+        "simple_maze.xml",
+    )
 
     tree = ET.parse(xml_path)
     worldbody = tree.find(".//worldbody")

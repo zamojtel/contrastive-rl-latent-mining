@@ -61,6 +61,11 @@ legal_envs = (
     "simple_u_maze",
     "simple_big_maze",
     "simple_hardest_maze",
+    "simple_m0",
+    "simple_m1",
+    "simple_m2",
+    "simple_m3",
+    "simple_m4",
 )
 
 
@@ -91,18 +96,32 @@ def create_env(env_name: str, backend: str = None, **kwargs) -> object:
         # This is stable only in mjx backend
         assert backend == "mjx" or backend is None
         env = AntPush(backend=backend or "mjx")
+    elif env_name.startswith("simple_"):
+        env = SimpleMaze(
+            backend=backend or "spring",
+            maze_layout_name=env_name.removeprefix("simple_"),
+            **kwargs,
+        )
     elif "maze" in env_name:
         if "ant_ball" in env_name:
-            env = AntBallMaze(backend=backend or "spring", maze_layout_name=env_name[9:])
+            env = AntBallMaze(
+                backend=backend or "spring",
+                maze_layout_name=env_name[9:],
+            )
         elif "ant" in env_name:
-            # Possible env_name = {'ant_u_maze', 'ant_big_maze', 'ant_hardest_maze'}
-            env = AntMaze(backend=backend or "spring", maze_layout_name=env_name[4:])
+            env = AntMaze(
+                backend=backend or "spring",
+                maze_layout_name=env_name[4:],
+            )
         elif "humanoid" in env_name:
-            # Possible env_name = {'humanoid_u_maze', 'humanoid_big_maze', 'humanoid_hardest_maze'}
-            env = HumanoidMaze(backend=backend or "spring", maze_layout_name=env_name[9:])
+            env = HumanoidMaze(
+                backend=backend or "spring",
+                maze_layout_name=env_name[9:],
+            )
         else:
-            # Possible env_name = {'simple_u_maze', 'simple_big_maze', 'simple_hardest_maze'}
-            env = SimpleMaze(backend=backend or "spring", maze_layout_name=env_name[7:])
+            raise ValueError(
+                f"Unknown maze environment: {env_name}"
+            )
     elif env_name == "cheetah":
         env = Halfcheetah()
     elif env_name == "pusher_easy":

@@ -62,6 +62,9 @@ class RunConfig:
     seed: int = 0
     backend: Optional[Literal["mjx", "spring", "positional", "generalized"]] = None
 
+    # Physical size of one maze-grid cell.
+    maze_size_scaling: float = 4.0
+
     # wandb logging
     exp_name: str = "run"
     log_wandb: bool = True
