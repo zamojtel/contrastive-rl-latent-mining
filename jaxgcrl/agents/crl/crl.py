@@ -235,7 +235,11 @@ class CRL:
         # Dimensions definitions and sanity checks
         action_size = train_env.action_size
         state_size = train_env.state_dim
-        goal_size = len(train_env.goal_indices)
+        goal_indices_array = np.asarray(train_env.goal_indices)
+        if goal_indices_array.ndim != 1 or goal_indices_array.size == 0:
+            raise ValueError("goal_indices must be a non-empty one-dimensional array")
+        goal_indices = tuple(int(index) for index in goal_indices_array.tolist())
+        goal_size = len(goal_indices)
         obs_size = state_size + goal_size
         assert obs_size == train_env.observation_size, (
             f"obs_size: {obs_size}, observation_size: {train_env.observation_size}"
@@ -419,7 +423,7 @@ class CRL:
                 action_size=action_size,
                 goal_size=goal_size,
                 obs_size=obs_size,
-                goal_indices=train_env.goal_indices,
+                goal_indices=goal_indices,
                 target_entropy=target_entropy,
             )
 
@@ -468,7 +472,7 @@ class CRL:
             # process transitions for training
             batch_keys = jax.random.split(sampling_key, transitions.observation.shape[0])
             transitions = jax.vmap(flatten_batch, in_axes=(None, 0, 0))(
-                (self.discounting, state_size, tuple(train_env.goal_indices)),
+                (self.discounting, state_size, goal_indices),
                 transitions,
                 batch_keys,
             )
@@ -586,13 +590,14 @@ class CRL:
                 do_render=do_render,
             )
 
+            # Package the latest parameters regardless of checkpoint settings.
+            params = (
+                training_state.alpha_state.params,
+                training_state.actor_state.params,
+                training_state.critic_state.params,
+            )
+
             if config.checkpoint_logdir:
-                # Save current policy and critic params.
-                params = (
-                    training_state.alpha_state.params,
-                    training_state.actor_state.params,
-                    training_state.critic_state.params,
-                )
                 path = f"{config.checkpoint_logdir}/step_{int(training_state.env_steps)}.pkl"
                 save_params(path, params)
 
