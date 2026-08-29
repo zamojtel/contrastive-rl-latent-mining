@@ -182,6 +182,17 @@ class CRL:
             "num_envs * (episode_length - 1) must be divisible by batch_size"
         )
 
+    def make_encoder(self) -> Encoder:
+        """Builds the encoder architecture shared by phi and psi."""
+        return Encoder(
+            repr_dim=self.repr_dim,
+            network_width=self.h_dim,
+            network_depth=self.n_hidden,
+            skip_connections=self.skip_connections,
+            use_relu=self.use_relu,
+            use_ln=self.use_ln,
+        )
+
     def train_fn(
         self,
         config: "RunConfig",
@@ -271,23 +282,9 @@ class CRL:
         )
 
         # Critic
-        sa_encoder = Encoder(
-            repr_dim=self.repr_dim,
-            network_width=self.h_dim,
-            network_depth=self.n_hidden,
-            skip_connections=self.skip_connections,
-            use_relu=self.use_relu,
-            use_ln=self.use_ln,
-        )
+        sa_encoder = self.make_encoder()
         sa_encoder_params = sa_encoder.init(sa_key, np.ones([1, state_size + action_size]))
-        g_encoder = Encoder(
-            repr_dim=self.repr_dim,
-            network_width=self.h_dim,
-            network_depth=self.n_hidden,
-            skip_connections=self.skip_connections,
-            use_relu=self.use_relu,
-            use_ln=self.use_ln,
-        )
+        g_encoder = self.make_encoder()
         g_encoder_params = g_encoder.init(g_key, np.ones([1, goal_size]))
         critic_state = TrainState.create(
             apply_fn=None,
