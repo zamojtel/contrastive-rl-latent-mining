@@ -193,6 +193,16 @@ class CRL:
             use_ln=self.use_ln,
         )
 
+    def make_actor(self, action_size: int) -> Actor:
+        """Builds the actor architecture used by training and evaluation."""
+        return Actor(
+            action_size=action_size,
+            network_width=self.h_dim,
+            network_depth=self.n_hidden,
+            skip_connections=self.skip_connections,
+            use_relu=self.use_relu,
+        )
+
     def train_fn(
         self,
         config: "RunConfig",
@@ -268,13 +278,7 @@ class CRL:
 
         # Network setup
         # Actor
-        actor = Actor(
-            action_size=action_size,
-            network_width=self.h_dim,
-            network_depth=self.n_hidden,
-            skip_connections=self.skip_connections,
-            use_relu=self.use_relu,
-        )
+        actor = self.make_actor(action_size)
         actor_state = TrainState.create(
             apply_fn=actor.apply,
             params=actor.init(actor_key, np.ones([1, obs_size])),

@@ -12,7 +12,7 @@ from typing import Any
 import jax.numpy as jnp
 
 from .crl import CRL, load_params
-from .networks import Encoder
+from .networks import Actor, Encoder
 
 
 _REQUIRED_ENCODER_FIELDS = {
@@ -139,6 +139,8 @@ class CRLLatentExtractor:
     """Raw CRL encoders reconstructed from a trusted run checkpoint."""
 
     encoder: Encoder
+    actor: Actor
+    actor_params: Any
     sa_encoder_params: Any
     g_encoder_params: Any
     metadata: dict[str, Any]
@@ -166,6 +168,17 @@ class CRLLatentExtractor:
             observation[..., : self.state_dim],
             observation[..., self.state_dim :],
         )
+
+    def deterministic_action(self, observation: Any) -> jnp.ndarray:
+        """Returns the deterministic evaluation action tanh(mean)."""
+        observation = _feature_array(observation, "observation")
+        self.split_observation(observation)
+
+        means, _ = self.actor.apply(
+            self.actor_params,
+            observation,
+        )
+        return jnp.tanh(means)
 
     def phi(self, state: Any, action: Any) -> jnp.ndarray:
         """Returns the raw phi(state, action) representation."""
@@ -315,6 +328,8 @@ def load_crl_latent_extractor(
 
     return CRLLatentExtractor(
         encoder=agent.make_encoder(),
+        actor=agent.make_actor(action_dim),
+        actor_params=actor_params,
         sa_encoder_params=sa_encoder_params,
         g_encoder_params=g_encoder_params,
         metadata=metadata,

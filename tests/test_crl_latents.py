@@ -11,7 +11,6 @@ from jaxgcrl.agents.crl import (
     load_crl_latent_extractor,
 )
 from jaxgcrl.agents.crl.crl import save_params
-from jaxgcrl.agents.crl.networks import Actor
 
 
 def write_test_run(tmp_path):
@@ -32,13 +31,7 @@ def write_test_run(tmp_path):
         use_ln=False,
     )
     encoder = agent.make_encoder()
-    actor = Actor(
-        action_size=action_dim,
-        network_width=agent.h_dim,
-        network_depth=agent.n_hidden,
-        skip_connections=agent.skip_connections,
-        use_relu=agent.use_relu,
-    )
+    actor = agent.make_actor(action_dim)
 
     actor_params = actor.init(
         jax.random.PRNGKey(0),
@@ -167,6 +160,64 @@ def test_checkpoint_steps_are_sorted_numerically_and_loadable(tmp_path):
     extractor = load_crl_latent_extractor(run_dir, checkpoint=2)
 
     assert extractor.checkpoint_path.name == "step_2.pkl"
+
+
+def test_crl_latent_extractor_matches_deterministic_actor_path(tmp_path):
+    run_dir, _, _, _ = write_test_run(tmp_path)
+    extractor = load_crl_latent_extractor(run_dir)
+
+    observations = jnp.asarray(
+        [
+            [1.0, 2.0, 0.1, 0.2, 5.0, 6.0],
+            [3.0, 4.0, 0.3, 0.4, 7.0, 8.0],
+        ]
+    )
+
+    means, _ = extractor.actor.apply(
+        extractor.actor_params,
+        observations,
+    )
+    expected_actions = jnp.tanh(means)
+
+    actions = extractor.deterministic_action(observations)
+
+    assert actions.shape == (2, extractor.action_dim)
+    np.testing.assert_allclose(
+        actions,
+        expected_actions,
+        rtol=1e-6,
+        atol=1e-6,
+    )
+    assert bool(jnp.all(actions >= -1.0))
+    assert bool(jnp.all(actions <= 1.0))
+
+    single_action = extractor.deterministic_action(
+        observations[0]
+    )
+    np.testing.assert_allclose(
+        single_action,
+        actions[0],
+        rtol=1e-6,
+        atol=1e-6,
+    )
+
+    compiled_actions = jax.jit(
+        lambda value: extractor.deterministic_action(value)
+    )(observations)
+    np.testing.assert_allclose(
+        compiled_actions,
+        actions,
+        rtol=1e-6,
+        atol=1e-6,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="observation has feature dimension",
+    ):
+        extractor.deterministic_action(
+            jnp.zeros((2, 5))
+        )
 
 
 def test_crl_latent_extractor_validates_input_shapes(tmp_path):
