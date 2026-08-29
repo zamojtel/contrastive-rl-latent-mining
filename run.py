@@ -9,6 +9,7 @@ from brax.io import model
 import wandb
 from jaxgcrl.utils.config import Config
 from jaxgcrl.utils.env import MetricsRecorder, create_env
+from jaxgcrl.utils.metadata import write_run_metadata
 
 
 def main(config: Config):
@@ -25,6 +26,7 @@ def main(config: Config):
         ./runs/
             run_{name}_s_{seed}/  # Run-specific directory
                 args.pkl          # Saved command-line arguments
+                metadata.json     # Human-readable run provenance
                 ckpt/            # Model checkpoints
     Initializes wandb logging if enabled. Runs training with profiling and
     saves profiling results.
@@ -76,6 +78,12 @@ def main(config: Config):
     os.makedirs(ckpt_dir, exist_ok=True)
     with open(run_dir + "/args.pkl", "wb") as f:
         pickle.dump(vars(config), f)
+
+    write_run_metadata(
+        run_dir,
+        config,
+        derived={"utd_ratio": utd_ratio},
+    )
 
     metrics_to_collect = [
         "eval/episode_dist",
