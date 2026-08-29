@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import hashlib
 import json
+import pickle
 from pathlib import Path
 import re
 from typing import Any
 
 import jax.numpy as jnp
 
-from .crl import CRL, load_params
+from .crl import CRL
 from .networks import Actor, Encoder
 
 
@@ -145,6 +147,7 @@ class CRLLatentExtractor:
     g_encoder_params: Any
     metadata: dict[str, Any]
     checkpoint_path: Path
+    checkpoint_sha256: str
     state_dim: int
     action_dim: int
     goal_dim: int
@@ -243,11 +246,16 @@ def load_crl_latent_extractor(
     checkpoint_path = _resolve_checkpoint_path(run_dir, checkpoint)
 
     try:
-        checkpoint_params = load_params(str(checkpoint_path))
+        checkpoint_bytes = checkpoint_path.read_bytes()
+        checkpoint_params = pickle.loads(checkpoint_bytes)
     except Exception as error:
         raise ValueError(
             f"Could not load trusted CRL checkpoint: {checkpoint_path}"
         ) from error
+
+    checkpoint_sha256 = hashlib.sha256(
+        checkpoint_bytes
+    ).hexdigest()
 
     if (
         not isinstance(checkpoint_params, (tuple, list))
@@ -334,6 +342,7 @@ def load_crl_latent_extractor(
         g_encoder_params=g_encoder_params,
         metadata=metadata,
         checkpoint_path=checkpoint_path,
+        checkpoint_sha256=checkpoint_sha256,
         state_dim=state_dim,
         action_dim=action_dim,
         goal_dim=goal_dim,
